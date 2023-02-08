@@ -29,9 +29,18 @@ pip install -r requirements.txt
 
 在bot.py中添加'hoshinobot-plugin-ddcheck'
 ```
+初次运行时由于需要下载chromium故可能会等待较长时间，请关注控制台输出的进度条<br><br>
+
+<<<<<<< HEAD
+### 已知问题
+由于windows下playwright无法兼容SelectorEventLoop，如果您的其他插件中包含有如下代码（一般是用于解决aiohttp的代理问题）
+=======
 
 若要显示主播牌子，需要在 `.config.json` 文件中添加任意的B站用户cookie：
 
+需要在 `.env.xxx` 文件中添加任意的B站用户cookie：
+
+>>>>>>> a9bbd8c2fe8349915dbb0a370965c630f81d890f
 ```
 "cookie" = "xxx"
 ```
@@ -44,6 +53,18 @@ asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 ```
 详情请见[#1](https://github.com/benx1n/hoshinobot-plugin-ddcheck/issues/1)
 已知有冲突的插件：setu_renew
+`cookie` 获取方式：
+
+`F12` 打开开发工具，查看 `www.bilibili.com` 请求的响应头，找形如 `SESSDATA=xxx;` 的字段，如：
+
+```
+bilibili_cookie="SESSDATA=xxx;"
+```
+
+<div align="left">
+  <img src="https://s2.loli.net/2022/07/19/AIBmd2Z9V5YwlkF.png" width="500" />
+</div>
+
 
 ### 示例
 
