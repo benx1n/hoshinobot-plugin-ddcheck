@@ -5,8 +5,8 @@ import jinja2
 from pathlib import Path
 from typing import List, Union
 from nonebot.log import logger
-from nonebot_plugin_apscheduler import scheduler
-from nonebot_plugin_htmlrender import html_to_pic
+#from nonebot_plugin_apscheduler import scheduler
+#from nonebot_plugin_htmlrender import html_to_pic
 
 from pathlib import Path
 
@@ -92,7 +92,7 @@ async def get_uid_by_name(name: str) -> int:
     try:
         url = "http://api.bilibili.com/x/web-interface/search/type"
         params = {"search_type": "bili_user", "keyword": name}
-        headers = {"cookie": config.cookie}
+        headers = {"cookie": config['cookie']}
         async with httpx.AsyncClient(timeout=10) as client:
             await client.get("https://www.bilibili.com", headers=headers)
             resp = await client.get(url, params=params)
@@ -123,7 +123,7 @@ async def get_medals(uid: int) -> List[dict]:
     try:
         url = "https://api.live.bilibili.com/xlive/web-ucenter/user/MedalWall"
         params = {"target_id": uid}
-        headers = {"cookie": config.cookie}
+        headers = {"cookie": config['cookie']}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, params=params, headers=headers)
             result = resp.json()
