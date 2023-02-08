@@ -5,8 +5,8 @@ import jinja2
 from pathlib import Path
 from typing import List, Union
 from nonebot.log import logger
-#from nonebot_plugin_apscheduler import scheduler
-#from nonebot_plugin_htmlrender import html_to_pic
+from nonebot_plugin_apscheduler import scheduler
+from nonebot_plugin_htmlrender import html_to_pic
 
 from pathlib import Path
 
@@ -17,7 +17,6 @@ from .htmlrender import html_to_pic
 with open('./hoshino/modules/hoshinobot-plugin-ddcheck/config.json','r', encoding='UTF-8') as json_data_file:
     config = json.load(json_data_file)
 
-bilibili_cookie = config['cookie']
 data_path = Path("data/ddcheck")
 vtb_list_path = data_path / "vtb_list.json"
 
@@ -44,11 +43,17 @@ async def update_vtb_list():
                 if not result:
                     continue
                 for info in result:
+                    if info.get("uid", None) and info.get("uname", None):
+                        vtb_list.append(
+                            {"mid": int(info["uid"]), "uname": info["uname"]}
+                        )
                     if info.get("mid", None) and info.get("uname", None):
                         vtb_list.append(info)
                 break
             except httpx.TimeoutException:
                 logger.warning(f"Get {url} timeout")
+            except Exception:
+                logger.exception(f"Error when getting {url}, ignore")
     dump_vtb_list(vtb_list)
     msg = "成分姬：自动更新vtb列表成功"
     return msg
@@ -87,12 +92,14 @@ async def get_uid_by_name(name: str) -> int:
     try:
         url = "http://api.bilibili.com/x/web-interface/search/type"
         params = {"search_type": "bili_user", "keyword": name}
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, params=params, timeout=10)
+        headers = {"cookie": config.cookie}
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.get("https://www.bilibili.com", headers=headers)
+            resp = await client.get(url, params=params)
             result = resp.json()
-        for user in result["data"]["result"]:
-            if user["uname"] == name:
-                return user["mid"]
+            for user in result["data"]["result"]:
+                if user["uname"] == name:
+                    return user["mid"]
         return 0
     except (KeyError, IndexError, httpx.TimeoutException) as e:
         logger.warning(f"Error in get_uid_by_name({name}): {e}")
@@ -103,10 +110,10 @@ async def get_user_info(uid: int) -> dict:
     try:
         url = "https://account.bilibili.com/api/member/getCardByMid"
         params = {"mid": uid}
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, params=params, timeout=10)
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, params=params)
             result = resp.json()
-        return result["card"]
+            return result["card"]
     except (KeyError, IndexError, httpx.TimeoutException) as e:
         logger.warning(f"Error in get_user_info({uid}): {e}")
         return {}
@@ -116,11 +123,11 @@ async def get_medals(uid: int) -> List[dict]:
     try:
         url = "https://api.live.bilibili.com/xlive/web-ucenter/user/MedalWall"
         params = {"target_id": uid}
-        headers = {"cookie": bilibili_cookie}
+        headers = {"cookie": config.cookie}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, params=params, headers=headers)
             result = resp.json()
-        return result["data"]["list"]
+            return result["data"]["list"]
     except (KeyError, IndexError, httpx.TimeoutException) as e:
         logger.warning(f"Error in get_medals({uid}): {e}")
         return []
@@ -153,7 +160,12 @@ async def get_reply(name: str) -> Union[str, bytes]:
         uid = await get_uid_by_name(name)
     user_info = await get_user_info(uid)
     if not user_info:
-        return "获取用户信息失败，请检查名称或稍后再试"
+        return "获取用户信息失败，请检查名称或使用uid查询"
+
+    attentions = user_info.get("attentions", [])
+    follows_num = int(user_info["attention"])
+    if not attentions and follows_num:
+        return "获取用户关注列表失败，关注列表可能未公开"
 
     vtb_list = await get_vtb_list()
     if not vtb_list:
@@ -163,12 +175,9 @@ async def get_reply(name: str) -> Union[str, bytes]:
     medal_dict = {medal["target_name"]: medal for medal in medals}
 
     vtb_dict = {info["mid"]: info for info in vtb_list}
-    vtbs = [
-        info for uid, info in vtb_dict.items() if uid in user_info.get("attentions", [])
-    ]
+    vtbs = [info for uid, info in vtb_dict.items() if uid in attentions]
     vtbs = [format_vtb_info(info, medal_dict) for info in vtbs]
 
-    follows_num = int(user_info["attention"])
     vtbs_num = len(vtbs)
     percent = vtbs_num / follows_num * 100 if follows_num else 0
     num_per_col = math.ceil(vtbs_num / math.ceil(vtbs_num / 100)) if vtbs_num else 1
@@ -177,7 +186,7 @@ async def get_reply(name: str) -> Union[str, bytes]:
         "uid": user_info["mid"],
         "face": user_info["face"],
         "fans": user_info["fans"],
-        "follows": user_info["attention"],
+        "follows": follows_num,
         "percent": f"{percent:.2f}% ({vtbs_num}/{follows_num})",
         "vtbs": vtbs,
         "num_per_col": num_per_col,
