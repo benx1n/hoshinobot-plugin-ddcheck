@@ -1,20 +1,20 @@
-import math
 import json
-import httpx
-import jinja2
+import math
+
+# from nonebot_plugin_apscheduler import scheduler
+# from nonebot_plugin_htmlrender import html_to_pic
 from pathlib import Path
 from typing import List, Union
-from nonebot.log import logger
-#from nonebot_plugin_apscheduler import scheduler
-#from nonebot_plugin_htmlrender import html_to_pic
 
-from pathlib import Path
-
+import httpx
 import jinja2
 from nonebot.log import logger
+
 from .htmlrender import html_to_pic
 
-with open('./hoshino/modules/hoshinobot-plugin-ddcheck/config.json','r', encoding='UTF-8') as json_data_file:
+with open(
+    "./hoshino/modules/hoshinobot-plugin-ddcheck/config.json", "r", encoding="UTF-8"
+) as json_data_file:
     config = json.load(json_data_file)
 
 data_path = Path("data/ddcheck")
@@ -25,6 +25,11 @@ template_path = dir_path / "template"
 env = jinja2.Environment(
     loader=jinja2.FileSystemLoader(template_path), enable_async=True
 )
+
+headers = {
+    "cookie": config["cookie"],
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 Edg/113.0.1774.35",  # noqa: E501
+}
 
 
 async def update_vtb_list():
@@ -92,7 +97,6 @@ async def get_uid_by_name(name: str) -> int:
     try:
         url = "http://api.bilibili.com/x/web-interface/search/type"
         params = {"search_type": "bili_user", "keyword": name}
-        headers = {"cookie": config['cookie']}
         async with httpx.AsyncClient(timeout=10) as client:
             await client.get("https://www.bilibili.com", headers=headers)
             resp = await client.get(url, params=params)
@@ -123,7 +127,6 @@ async def get_medals(uid: int) -> List[dict]:
     try:
         url = "https://api.live.bilibili.com/xlive/web-ucenter/user/MedalWall"
         params = {"target_id": uid}
-        headers = {"cookie": config['cookie']}
         async with httpx.AsyncClient() as client:
             resp = await client.get(url, params=params, headers=headers)
             result = resp.json()
@@ -194,4 +197,3 @@ async def get_reply(name: str) -> Union[str, bytes]:
     template = env.get_template("info.html")
     content = await template.render_async(info=result)
     return await html_to_pic(content, wait=0, viewport={"width": 100, "height": 100})
-
